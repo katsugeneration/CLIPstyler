@@ -146,6 +146,7 @@ parser.add_argument('--save_img_interval', type=int, default=100)
 parser.add_argument('--crop_size', type=int, default=224)
 parser.add_argument('--thresh', type=float, default=0.7)
 parser.add_argument('--decoder', type=str, default='./models/decoder.pth')
+parser.add_argument('--style_img_dir', type=str, default=None, help="Path to a directory containing images (png, jpg or jpeg) with a specific style to mimic")
 args = parser.parse_args()
 
 device = torch.device('cuda')
@@ -170,12 +171,28 @@ def compose_text_with_templates(text: str, templates=imagenet_templates) -> list
 source = "a Photo"
 
 with torch.no_grad():
-    prompt = args.text
-    template_text = compose_text_with_templates(prompt, imagenet_templates)
-    tokens = clip.tokenize(template_text).to(device)
-    text_features = clip_model.encode_text(tokens).detach()
-    text_features = text_features.mean(axis=0, keepdim=True)
-    text_features /= text_features.norm(dim=-1, keepdim=True)
+    if args.style_img_dir is not None:
+        valid_exts=[".png", ".jpg", ".jpeg"]
+        target_images = [os.path.join(args.style_img_dir, file_name) for file_name in os.listdir(args.style_img_dir) 
+                 if os.path.splitext(file_name)[1].lower() in valid_exts]
+
+        target_encodings = []
+        for target_img in target_images:
+            preprocessed = clip_normalize(Image.open(target_img)).unsqueeze(0).to(self.device)
+            encoding = clip_model.encode_image(preprocessed)
+            target_encodings.append(encoding)
+        
+        target_encoding = torch.cat(target_encodings, axis=0)
+        target_encoding /= target_encoding.norm(dim=-1, keepdim=True)
+        text_features = target_encoding.mean(dim=0, keepdim=True)
+    else:
+        prompt = args.text
+        template_text = compose_text_with_templates(prompt, imagenet_templates)
+        tokens = clip.tokenize(template_text).to(device)
+        text_features = clip_model.encode_text(tokens).detach()
+        text_features = text_features.mean(axis=0, keepdim=True)
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+
     template_source = compose_text_with_templates(source, imagenet_templates)
     tokens_source = clip.tokenize(template_source).to(device)
     text_source = clip_model.encode_text(tokens_source).detach()
