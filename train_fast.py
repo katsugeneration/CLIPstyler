@@ -178,12 +178,8 @@ with torch.no_grad():
                  if os.path.splitext(file_name)[1].lower() in valid_exts]
 
         target_encodings = []
-        transform = transforms.Compose([
-                transforms.ToTensor(),
-                ])
         for target_img in target_images:
-            image = transform(Image.open(target_img))
-            preprocessed = clip_normalize(image).unsqueeze(0).to(device)
+            preprocessed = clip_normalize(load_image(target_img).to(device))
             encoding = clip_model.encode_image(preprocessed)
             target_encodings.append(encoding)
         
