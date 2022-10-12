@@ -185,7 +185,15 @@ with torch.no_grad():
         
         target_encoding = torch.cat(target_encodings, axis=0)
         target_encoding /= target_encoding.norm(dim=-1, keepdim=True)
-        text_features = target_encoding.mean(dim=0, keepdim=True)
+        target_encoding = target_encoding.mean(dim=0, keepdim=True)
+
+        template_text = compose_text_with_templates(prompt, imagenet_templates)
+        tokens = clip.tokenize(template_text).to(device)
+        text_features = clip_model.encode_text(tokens).detach()
+        text_features = text_features.mean(axis=0, keepdim=True)
+        text_features /= text_features.norm(dim=-1, keepdim=True)
+        text_features += target_encoding
+        text_features /= text_features.norm(dim=-1, keepdim=True)
     else:
         prompt = args.text
         template_text = compose_text_with_templates(prompt, imagenet_templates)
